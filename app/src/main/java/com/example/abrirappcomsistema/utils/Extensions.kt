@@ -1,11 +1,17 @@
 package com.example.abrirappcomsistema.utils
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.provider.Settings
 import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings.canDrawOverlays
 import android.util.Log
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import com.example.abrirappcomsistema.App
 
 fun Context.openAppByPackageName(packageName: String) {
@@ -29,6 +35,14 @@ fun Context.openAppByPackageName(packageName: String) {
             Log.i("teste", "openAppByPackageName: Caso Play Store não esteja instalada, abrir no navegador")
         }
     }
+}
+
+fun Context.showMessageToast(message: String) {
+    Toast.makeText(
+        this,
+        message,
+        Toast.LENGTH_LONG)
+        .show()
 }
 
 fun Context.getInstalledApps(): List<App> {
@@ -71,4 +85,72 @@ fun Context.saveAppUser(packageName: String): Boolean {
 
 fun Context.getAppUser() : String {
     return sharedPreferencesAppSaved()?.getString("app_selected", "") ?: ""
+}
+
+
+fun Context.abrirTelaOtimizacaoBateria(activity: Activity) {
+    val intent = Intent()
+    // Tenta abrir a tela de otimização de bateria do sistema
+    intent.action = Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS
+    if (intent.resolveActivity(this.packageManager) != null) {
+        this.startActivity(intent)
+    } else {
+        // Se a tela não existir, tenta abrir a tela de informações do app
+        intent.action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+        val uri = Uri.fromParts("package", this.packageName, null)
+        intent.data = uri
+        this.startActivity(intent)
+        // Exibe uma mensagem explicando ao usuário como desativar a otimização manualmente
+        showMessageToast("Por favor, encontre o app na lista e desative a otimização de bateria.")
+    }
+}
+
+fun Context.abrirTelaPermissaoSobreposicao(activity: Activity) {
+    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+    val uri = Uri.fromParts("package", this.packageName, null)
+    intent.data = uri
+    if (intent.resolveActivity(this.packageManager) != null) {
+        this.startActivity(intent)
+    } else {
+        // Se a tela não existir, exibe uma mensagem explicando ao usuário
+        showMessageToast("Não foi possível abrir a tela de permissão de sobreposição.")
+    }
+}
+
+@SuppressLint("ServiceCast")
+fun Activity.isBatteryOptimizationDisabled(activity: Activity): Boolean {
+    val powerManager = this.getSystemService(Context.POWER_SERVICE) as PowerManager
+    return powerManager.isIgnoringBatteryOptimizations(this.packageName)
+}
+
+fun Activity.checkBatteryOptimization() {
+    if (!isBatteryOptimizationDisabled(this)) {
+        AlertDialog.Builder(this)
+            .setTitle("Otimização de Bateria")
+            .setMessage("Para o funcionamento correto do app, é necessário desativar a otimização de bateria.")
+            .setPositiveButton("Abrir Configurações") { dialog, _ ->
+                abrirTelaOtimizacaoBateria(this)
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancelar") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+}
+
+fun Activity.checkOverlayPermission() {
+    if (!canDrawOverlays(this)) {
+        AlertDialog.Builder(this)
+            .setTitle("Permissão de Sobreposição")
+            .setMessage("Para o funcionamento correto do app, é necessário conceder a permissão de sobreposição.")
+            .setPositiveButton("Abrir Configurações") { dialog, _ ->
+                abrirTelaPermissaoSobreposicao(this)
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancelar") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
 }
